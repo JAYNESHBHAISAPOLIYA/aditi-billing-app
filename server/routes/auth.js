@@ -31,6 +31,36 @@ router.post('/login', (req, res) => {
   });
 });
 
+// Register new user (public)
+router.post('/register', (req, res) => {
+  const { username, password, full_name, role, email, phone } = req.body;
+  if (!username || !password || !full_name || !role) {
+    return res.status(400).json({ error: 'Username, password, full_name, and role are required' });
+  }
+  if (password.length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters' });
+  }
+  if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+    return res.status(400).json({ error: 'Username can only contain letters, numbers, and underscores' });
+  }
+  const validRoles = ['owner', 'site_manager', 'accountant', 'worker'];
+  if (!validRoles.includes(role)) {
+    return res.status(400).json({ error: `Invalid role. Must be one of: ${validRoles.join(', ')}` });
+  }
+  const hash = bcrypt.hashSync(password, 10);
+  try {
+    const result = db.prepare(
+      'INSERT INTO users (username, password, full_name, role, email, phone) VALUES (?, ?, ?, ?, ?, ?)'
+    ).run(username, hash, full_name, role, email || null, phone || null);
+    res.status(201).json({ id: result.lastInsertRowid, username, full_name, role });
+  } catch (err) {
+    if (err.message.includes('UNIQUE')) {
+      return res.status(409).json({ error: 'Username already exists' });
+    }
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Get current user profile
 router.get('/me', authenticate, (req, res) => {
   const user = db.prepare('SELECT id, username, full_name, role, email, phone, assigned_site_id FROM users WHERE id = ?').get(req.user.id);
