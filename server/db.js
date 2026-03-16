@@ -222,7 +222,113 @@ function initializeDatabase() {
       created_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (site_id) REFERENCES sites(id)
     );
+
+    -- SOR Rates (Schedule of Rates - government rate book)
+    CREATE TABLE IF NOT EXISTS sor_rates (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      state TEXT NOT NULL DEFAULT 'Gujarat',
+      year TEXT NOT NULL DEFAULT '2024-25',
+      item_code TEXT,
+      description TEXT NOT NULL,
+      unit TEXT NOT NULL,
+      rate REAL NOT NULL,
+      category TEXT,
+      keywords TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    -- DPR (Daily Progress Reports) structured data
+    CREATE TABLE IF NOT EXISTS dpr_records (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      site_id INTEGER NOT NULL,
+      report_date TEXT NOT NULL,
+      extracted_data TEXT,
+      labour_skilled INTEGER DEFAULT 0,
+      labour_unskilled INTEGER DEFAULT 0,
+      labour_amount REAL DEFAULT 0,
+      weather TEXT,
+      remarks TEXT,
+      source_doc TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (site_id) REFERENCES sites(id)
+    );
+
+    -- DPR Work Items
+    CREATE TABLE IF NOT EXISTS dpr_work_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      dpr_id INTEGER NOT NULL,
+      site_id INTEGER NOT NULL,
+      item_description TEXT,
+      quantity REAL DEFAULT 0,
+      unit TEXT,
+      location TEXT,
+      boq_item_id INTEGER,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (dpr_id) REFERENCES dpr_records(id),
+      FOREIGN KEY (site_id) REFERENCES sites(id),
+      FOREIGN KEY (boq_item_id) REFERENCES boq_items(id)
+    );
+
+    -- AI Chat History
+    CREATE TABLE IF NOT EXISTS ai_chat_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      site_id INTEGER,
+      user_message TEXT NOT NULL,
+      ai_response TEXT NOT NULL,
+      tables_referenced TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (site_id) REFERENCES sites(id)
+    );
+
+    -- RA Bills
+    CREATE TABLE IF NOT EXISTS ra_bills (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      site_id INTEGER NOT NULL,
+      bill_no INTEGER NOT NULL,
+      bill_period_from TEXT,
+      bill_period_to TEXT,
+      bill_date TEXT,
+      gross_amount REAL DEFAULT 0,
+      tp_deduction REAL DEFAULT 0,
+      price_variation REAL DEFAULT 0,
+      retention REAL DEFAULT 0,
+      net_amount REAL DEFAULT 0,
+      status TEXT DEFAULT 'draft' CHECK(status IN ('draft','submitted','approved','paid')),
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (site_id) REFERENCES sites(id)
+    );
   `);
+
+  // Extend boq_items with AI/SOR columns (idempotent)
+  const boqCols = db.prepare("PRAGMA table_info(boq_items)").all().map(c => c.name);
+  if (!boqCols.includes('item_code')) db.prepare("ALTER TABLE boq_items ADD COLUMN item_code TEXT").run();
+  if (!boqCols.includes('qty_tender')) db.prepare("ALTER TABLE boq_items ADD COLUMN qty_tender REAL DEFAULT 0").run();
+  if (!boqCols.includes('qty_used')) db.prepare("ALTER TABLE boq_items ADD COLUMN qty_used REAL DEFAULT 0").run();
+  if (!boqCols.includes('sor_rate')) db.prepare("ALTER TABLE boq_items ADD COLUMN sor_rate REAL DEFAULT 0").run();
+  if (!boqCols.includes('sor_match_confidence')) db.prepare("ALTER TABLE boq_items ADD COLUMN sor_match_confidence REAL DEFAULT 0").run();
+  if (!boqCols.includes('source_doc')) db.prepare("ALTER TABLE boq_items ADD COLUMN source_doc TEXT").run();
+  if (!boqCols.includes('sor_item_id')) db.prepare("ALTER TABLE boq_items ADD COLUMN sor_item_id INTEGER").run();
+
+  // Seed SOR rates if empty
+  const sorCount = db.prepare("SELECT COUNT(*) as cnt FROM sor_rates").get();
+  if (sorCount.cnt === 0) {
+    const seedRates = [
+      { state: 'Gujarat', year: '2024-25', item_code: 'B-1-01', description: 'DI K7 class pipe 100mm dia including laying, jointing, testing', unit: 'RM', rate: 485, category: 'Water Supply', keywords: 'DI pipe 100mm water supply laying' },
+      { state: 'Gujarat', year: '2024-25', item_code: 'B-1-02', description: 'DI K9 class pipe 150mm dia including laying, jointing, testing', unit: 'RM', rate: 720, category: 'Water Supply', keywords: 'DI pipe 150mm water supply laying' },
+      { state: 'Gujarat', year: '2024-25', item_code: 'B-1-03', description: 'DI K9 class pipe 200mm dia including laying, jointing, testing', unit: 'RM', rate: 1050, category: 'Water Supply', keywords: 'DI pipe 200mm water supply laying' },
+      { state: 'Gujarat', year: '2024-25', item_code: 'B-2-01', description: 'Sluice valve 100mm flanged including all accessories', unit: 'Nos', rate: 8500, category: 'Water Supply', keywords: 'sluice valve 100mm gate valve' },
+      { state: 'Gujarat', year: '2024-25', item_code: 'B-2-02', description: 'Sluice valve 150mm flanged including all accessories', unit: 'Nos', rate: 14500, category: 'Water Supply', keywords: 'sluice valve 150mm gate valve' },
+      { state: 'Gujarat', year: '2024-25', item_code: 'C-1-01', description: 'Brick masonry valve chamber 0.9x0.9x1.2m with RCC cover', unit: 'Nos', rate: 12500, category: 'Civil', keywords: 'valve chamber brick masonry cover' },
+      { state: 'Gujarat', year: '2024-25', item_code: 'R-1-01', description: 'Earthwork excavation in ordinary soil for pipe trench depth upto 1.5m', unit: 'Cum', rate: 185, category: 'Earthwork', keywords: 'excavation soil trench earthwork' },
+      { state: 'Gujarat', year: '2024-25', item_code: 'R-1-02', description: 'Refilling of excavated earth in trenches with compaction', unit: 'Cum', rate: 95, category: 'Earthwork', keywords: 'refilling backfill trench compaction' },
+      { state: 'Gujarat', year: '2024-25', item_code: 'P-1-01', description: 'UPVC pressure pipe 110mm dia Class C including laying and jointing', unit: 'RM', rate: 285, category: 'Water Supply', keywords: 'UPVC pipe 110mm pressure laying' },
+      { state: 'Gujarat', year: '2024-25', item_code: 'P-1-02', description: 'HDPE pipe 63mm dia PN 10 for house service connection', unit: 'RM', rate: 165, category: 'Water Supply', keywords: 'HDPE pipe 63mm service connection household' },
+    ];
+    const insertSor = db.prepare("INSERT INTO sor_rates (state, year, item_code, description, unit, rate, category, keywords) VALUES (?,?,?,?,?,?,?,?)");
+    for (const r of seedRates) {
+      insertSor.run(r.state, r.year, r.item_code, r.description, r.unit, r.rate, r.category, r.keywords);
+    }
+  }
 }
 
 module.exports = { db, initializeDatabase };
