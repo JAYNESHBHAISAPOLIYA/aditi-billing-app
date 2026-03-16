@@ -222,7 +222,61 @@ function initializeDatabase() {
       created_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (site_id) REFERENCES sites(id)
     );
+
+    -- SOR Rates (Schedule of Rates)
+    CREATE TABLE IF NOT EXISTS sor_rates (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      state TEXT NOT NULL DEFAULT 'Gujarat',
+      year TEXT NOT NULL DEFAULT '2024-25',
+      item_code TEXT,
+      description TEXT NOT NULL,
+      unit TEXT NOT NULL,
+      rate REAL NOT NULL,
+      category TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    -- DPR Records (Daily Progress Reports - AI extracted)
+    CREATE TABLE IF NOT EXISTS dpr_records (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      site_id INTEGER NOT NULL,
+      report_date TEXT NOT NULL,
+      work_done TEXT,
+      labour_skilled INTEGER DEFAULT 0,
+      labour_unskilled INTEGER DEFAULT 0,
+      labour_amount REAL DEFAULT 0,
+      materials_used TEXT,
+      remarks TEXT,
+      weather TEXT,
+      file_path TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (site_id) REFERENCES sites(id)
+    );
   `);
+
+  // Add new columns to boq_items if they don't exist (migration)
+  const boqCols = db.prepare("PRAGMA table_info(boq_items)").all().map(c => c.name);
+  if (!boqCols.includes('item_code')) {
+    db.exec("ALTER TABLE boq_items ADD COLUMN item_code TEXT");
+  }
+  if (!boqCols.includes('qty_tender')) {
+    db.exec("ALTER TABLE boq_items ADD COLUMN qty_tender REAL");
+  }
+  if (!boqCols.includes('qty_used')) {
+    db.exec("ALTER TABLE boq_items ADD COLUMN qty_used REAL DEFAULT 0");
+  }
+  if (!boqCols.includes('sor_rate')) {
+    db.exec("ALTER TABLE boq_items ADD COLUMN sor_rate REAL");
+  }
+  if (!boqCols.includes('sor_item_id')) {
+    db.exec("ALTER TABLE boq_items ADD COLUMN sor_item_id INTEGER");
+  }
+  if (!boqCols.includes('source_doc')) {
+    db.exec("ALTER TABLE boq_items ADD COLUMN source_doc TEXT");
+  }
+  if (!boqCols.includes('sor_match_score')) {
+    db.exec("ALTER TABLE boq_items ADD COLUMN sor_match_score REAL");
+  }
 }
 
 module.exports = { db, initializeDatabase };

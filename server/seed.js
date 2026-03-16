@@ -116,4 +116,50 @@ for (const v of vendorData) {
   } catch (e) { /* ignore */ }
 }
 
+// Seed SOR Rates (Gujarat PWD SOR 2024-25)
+const sorRates = [
+  { code: 'WS-101', desc: 'DI K7 Class Pipe 100mm dia (Supply & Laying)', unit: 'RM', rate: 485, cat: 'Water Supply' },
+  { code: 'WS-102', desc: 'DI K9 Class Pipe 150mm dia (Supply & Laying)', unit: 'RM', rate: 720, cat: 'Water Supply' },
+  { code: 'WS-103', desc: 'HDPE Pipe 63mm dia (Supply & Laying)', unit: 'RM', rate: 185, cat: 'Water Supply' },
+  { code: 'WS-104', desc: 'Sluice Valve 100mm dia (Supply & Fixing)', unit: 'Nos', rate: 8500, cat: 'Water Supply' },
+  { code: 'WS-105', desc: 'Air Valve 25mm (Supply & Fixing)', unit: 'Nos', rate: 3200, cat: 'Water Supply' },
+  { code: 'RD-201', desc: 'Earthwork Excavation in ordinary soil', unit: 'Cum', rate: 180, cat: 'Roadwork' },
+  { code: 'RD-202', desc: 'Granular Sub-Base (GSB) providing & laying 100mm thick', unit: 'Sqm', rate: 210, cat: 'Roadwork' },
+  { code: 'BLD-301', desc: 'PCC M15 grade (1:2:4) providing & laying', unit: 'Cum', rate: 4800, cat: 'Building' },
+  { code: 'BLD-302', desc: 'RCC M25 grade including shuttering & reinforcement', unit: 'Cum', rate: 8500, cat: 'Building' },
+  { code: 'WS-106', desc: 'Brick Masonry in CM 1:6 in foundation', unit: 'Cum', rate: 5200, cat: 'Building' },
+];
+
+for (const s of sorRates) {
+  try {
+    db.prepare(`
+      INSERT OR IGNORE INTO sor_rates (state, year, item_code, description, unit, rate, category)
+      VALUES ('Gujarat', '2024-25', ?, ?, ?, ?, ?)
+    `).run(s.code, s.desc, s.unit, s.rate, s.cat);
+  } catch (e) { /* ignore */ }
+}
+
+// Seed sample BOQ items for first site (using SOR data)
+try {
+  const firstSite = db.prepare('SELECT id FROM sites LIMIT 1').get();
+  if (firstSite) {
+    const sampleBOQ = [
+      { no: '1', code: 'WS-101', desc: 'DI K7 Class Pipe 100mm dia (Supply & Laying)', qty: 2400, unit: 'RM', rate: 485, sor: 485 },
+      { no: '2', code: 'WS-102', desc: 'DI K9 Class Pipe 150mm dia (Supply & Laying)', qty: 1200, unit: 'RM', rate: 720, sor: 720 },
+      { no: '3', code: 'WS-104', desc: 'Sluice Valve 100mm dia (Supply & Fixing)', qty: 12, unit: 'Nos', rate: 8500, sor: 8500 },
+      { no: '4', code: 'BLD-301', desc: 'PCC M15 grade (1:2:4) providing & laying', qty: 50, unit: 'Cum', rate: 4800, sor: 4800 },
+    ];
+    for (const b of sampleBOQ) {
+      const total = b.qty * b.rate;
+      const existing = db.prepare('SELECT id FROM boq_items WHERE site_id = ? AND item_code = ?').get(firstSite.id, b.code);
+      if (!existing) {
+        db.prepare(`
+          INSERT INTO boq_items (site_id, item_number, item_code, description, quantity, qty_tender, qty_used, unit, rate, sor_rate, total_amount, work_completed_pct, remaining_work, actual_cost, sor_match_score)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(firstSite.id, b.no, b.code, b.desc, b.qty, b.qty, Math.floor(b.qty * 0.4), b.unit, b.rate, b.sor, total, 40, b.qty * 0.6, total * 0.4, 100);
+      }
+    }
+  }
+} catch (e) { /* ignore */ }
+
 console.log('Database seeded successfully!');

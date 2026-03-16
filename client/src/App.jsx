@@ -20,6 +20,7 @@ import Vendors from './pages/Vendors';
 import Alerts from './pages/Alerts';
 import Users from './pages/Users';
 import Reports from './pages/Reports';
+import AIChat from './pages/AIChat';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -47,6 +48,7 @@ export default function App() {
         <Route path="daily-reports" element={<DailyReports />} />
         <Route path="documents" element={<Documents />} />
         <Route path="boq" element={<BOQ />} />
+        <Route path="ai-chat" element={<AIChat />} />
         <Route path="vendors" element={<Vendors />} />
         <Route path="alerts" element={<Alerts />} />
         <Route path="users" element={<Users />} />

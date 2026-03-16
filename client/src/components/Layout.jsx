@@ -15,6 +15,7 @@ const navItems = [
   { path: '/daily-reports', label: '📝 Daily Reports', roles: ['owner', 'site_manager'] },
   { path: '/documents', label: '📄 Documents', roles: ['owner', 'site_manager', 'accountant'] },
   { path: '/boq', label: '📋 BOQ Tracking', roles: ['owner', 'site_manager'] },
+  { path: '/ai-chat', label: '🤖 AI Assistant', roles: ['owner', 'site_manager', 'accountant'] },
   { path: '/vendors', label: '🤝 Vendors', roles: ['owner', 'accountant'] },
   { path: '/alerts', label: '🔔 Alerts', roles: ['owner', 'site_manager', 'accountant'] },
   { path: '/users', label: '👥 Users', roles: ['owner'] },
