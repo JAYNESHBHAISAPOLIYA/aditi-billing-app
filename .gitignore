@@ -6,3 +6,6 @@ uploads/*
 *.log
 .DS_Store
 coverage/
+*.db
+*.db-shm
+*.db-wal
