@@ -94,7 +94,7 @@ router.get('/generate/:site_id', authenticate, async (req, res) => {
     const dataRow = absSheet.getRow(9);
     [1, `B-1`, site.site_name, totalBOQAmt, totalUptoAmt, prevBillAmt, thisBillAmt].forEach((v, i) => {
       const cell = dataRow.getCell(i + 1);
-      cell.value = typeof v === 'number' ? v : v;
+      cell.value = v;
       cell.border = thinBorder;
       if (typeof v === 'number') {
         cell.numFmt = '##,##,##0.00';

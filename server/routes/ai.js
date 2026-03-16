@@ -349,7 +349,7 @@ router.post('/ask/:site_id', authenticate, async (req, res) => {
           model: 'claude-opus-4-5',
           max_tokens: 1024,
           system: `You are AI assistant for Government Construction ERP system. 
-The data provided is from a live PostgreSQL/SQLite database. 
+The data provided is from a live SQLite database. 
 Answer precisely with specific numbers from the data. 
 Use Indian number format for amounts (₹1,00,000).
 Answer in the SAME language the user asks (Gujarati/Hindi/English).
