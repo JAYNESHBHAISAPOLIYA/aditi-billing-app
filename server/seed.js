@@ -116,4 +116,24 @@ for (const v of vendorData) {
   } catch (e) { /* ignore */ }
 }
 
+// Seed SOR Rates (Gujarat PWD SOR 2024-25)
+const sorRates = [
+  { state: 'Gujarat', year: '2024-25', item_code: 'WS-001', description: 'DI K7 Pipe 100mm dia laying including jointing', unit: 'RM', rate: 485, category: 'Water Supply', keywords: 'DI pipe,100mm,K7,ductile iron,water supply' },
+  { state: 'Gujarat', year: '2024-25', item_code: 'WS-002', description: 'DI K7 Pipe 150mm dia laying including jointing', unit: 'RM', rate: 720, category: 'Water Supply', keywords: 'DI pipe,150mm,K7,ductile iron,water supply' },
+  { state: 'Gujarat', year: '2024-25', item_code: 'WS-003', description: 'DI K7 Pipe 200mm dia laying including jointing', unit: 'RM', rate: 980, category: 'Water Supply', keywords: 'DI pipe,200mm,K7,ductile iron,water supply' },
+  { state: 'Gujarat', year: '2024-25', item_code: 'WS-004', description: 'Gate valve 100mm dia (IS:14846) installation', unit: 'Nos', rate: 12500, category: 'Water Supply', keywords: 'gate valve,100mm,valve,sluice valve' },
+  { state: 'Gujarat', year: '2024-25', item_code: 'WS-005', description: 'Air valve 50mm dia installation', unit: 'Nos', rate: 8500, category: 'Water Supply', keywords: 'air valve,50mm,air release valve' },
+  { state: 'Gujarat', year: '2024-25', item_code: 'RD-001', description: 'Earthwork excavation in soft soil', unit: 'Cum', rate: 185, category: 'Roads', keywords: 'earthwork,excavation,soft soil,earth cutting' },
+  { state: 'Gujarat', year: '2024-25', item_code: 'RD-002', description: 'GSB (Granular Sub Base) 200mm thick compacted', unit: 'Sqm', rate: 245, category: 'Roads', keywords: 'GSB,granular sub base,road base,sub base' },
+  { state: 'Gujarat', year: '2024-25', item_code: 'RD-003', description: 'WBM (Water Bound Macadam) 75mm thick', unit: 'Sqm', rate: 320, category: 'Roads', keywords: 'WBM,water bound macadam,road,macadam' },
+  { state: 'Gujarat', year: '2024-25', item_code: 'BLD-001', description: 'RCC M20 grade concrete for foundations', unit: 'Cum', rate: 6800, category: 'Buildings', keywords: 'RCC,M20,concrete,foundation,reinforced cement concrete' },
+  { state: 'Gujarat', year: '2024-25', item_code: 'BLD-002', description: 'Brick masonry in CM 1:6 in superstructure', unit: 'Cum', rate: 5200, category: 'Buildings', keywords: 'brick masonry,cement mortar,brick work,masonry' },
+];
+
+for (const sor of sorRates) {
+  try {
+    db.prepare(`INSERT OR IGNORE INTO sor_rates (state, year, item_code, description, unit, rate, category, keywords) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(sor.state, sor.year, sor.item_code, sor.description, sor.unit, sor.rate, sor.category, sor.keywords);
+  } catch (e) { /* ignore */ }
+}
+
 console.log('Database seeded successfully!');

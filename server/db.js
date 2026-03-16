@@ -222,6 +222,51 @@ function initializeDatabase() {
       created_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (site_id) REFERENCES sites(id)
     );
+
+    -- SOR Rates (Schedule of Rates - government published rate book)
+    CREATE TABLE IF NOT EXISTS sor_rates (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      state TEXT NOT NULL,
+      year TEXT NOT NULL,
+      item_code TEXT,
+      description TEXT NOT NULL,
+      unit TEXT NOT NULL,
+      rate REAL NOT NULL,
+      category TEXT,
+      keywords TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    -- DPR Records (Daily Progress Reports with AI-extracted data)
+    CREATE TABLE IF NOT EXISTS dpr_records (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      site_id INTEGER NOT NULL,
+      report_date TEXT NOT NULL,
+      raw_text TEXT,
+      work_done TEXT,
+      labour_skilled INTEGER DEFAULT 0,
+      labour_unskilled INTEGER DEFAULT 0,
+      labour_wages REAL DEFAULT 0,
+      materials_used TEXT,
+      remarks TEXT,
+      weather TEXT,
+      file_path TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (site_id) REFERENCES sites(id)
+    );
+
+    -- AI Chat History
+    CREATE TABLE IF NOT EXISTS ai_chat_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      site_id INTEGER,
+      user_id INTEGER,
+      question TEXT NOT NULL,
+      answer TEXT NOT NULL,
+      tables_used TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (site_id) REFERENCES sites(id),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
   `);
 }
 
