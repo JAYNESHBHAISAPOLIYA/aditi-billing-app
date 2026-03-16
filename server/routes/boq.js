@@ -103,8 +103,9 @@ router.get('/ra-bill/:site_id', authenticate, async (req, res) => {
       items,
     });
 
+    const safeName = site.site_name.replace(/[^a-zA-Z0-9_\-]/g, '_');
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename="RA_Bill_${bill_no || 1}_${site.site_name.replace(/\s+/g, '_')}.xlsx"`);
+    res.setHeader('Content-Disposition', `attachment; filename="RA_Bill_${bill_no || 1}_${safeName}.xlsx"`);
     res.send(Buffer.from(excelBuffer));
   } catch (err) {
     console.error('RA bill error:', err);

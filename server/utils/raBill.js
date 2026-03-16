@@ -22,6 +22,17 @@ async function generateRaBill(billData) {
   workbook.created = new Date();
 
   // ─────────────────────────────────────────────────────────────────
+  // STEP 1: Create ALL sheets in required order
+  // ─────────────────────────────────────────────────────────────────
+  const paymentAbstractSheet  = workbook.addWorksheet('Payment Abstract');
+  const statementSheet        = workbook.addWorksheet('Statement of Account');
+  const abstractSheet         = workbook.addWorksheet('Abstract Sheet');
+  const mbSheet               = workbook.addWorksheet('MB Sheet');
+  const pipeSheet             = workbook.addWorksheet('Pipe Statement of Supply');
+  const annexure1Sheet        = workbook.addWorksheet('Annexure - 1');
+  const annexure2Sheet        = workbook.addWorksheet('Annexure - 2');
+
+  // ─────────────────────────────────────────────────────────────────
   // Helper styles
   // ─────────────────────────────────────────────────────────────────
   const headerFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDDEEFF' } };
@@ -78,11 +89,121 @@ async function generateRaBill(billData) {
   const thisAmt = grandTotals.this_amt;
   const prevAmt = grandTotals.prev_amt;
 
-  // ─────────────────────────────────────────────────────────────────
-  // Sheet 3: Abstract Sheet (build first so we have references)
-  // ─────────────────────────────────────────────────────────────────
-  const abstractSheet = workbook.addWorksheet('Abstract Sheet');
+  const tp = 0.036; // 3.60%
+  const totalC = thisAmt;
+  const tpAmt = totalC * tp;
+  const afterTP = totalC - tpAmt;
+  const priceVar = 0;
+  const afterPV = afterTP + priceVar;
+  const retention = afterPV * 0.05;
+  const netPayable = afterPV - retention;
 
+  // ─────────────────────────────────────────────────────────────────
+  // STEP 2: Populate Sheet 1 - Payment Abstract
+  // ─────────────────────────────────────────────────────────────────
+  paymentAbstractSheet.columns = [
+    { key: 'a', width: 8  },
+    { key: 'b', width: 14 },
+    { key: 'c', width: 25 },
+    { key: 'd', width: 18 },
+    { key: 'e', width: 18 },
+    { key: 'f', width: 18 },
+    { key: 'g', width: 18 },
+    { key: 'h', width: 12 },
+    { key: 'i', width: 12 },
+    { key: 'j', width: 12 },
+  ];
+
+  function addMergedTitle(sheet, value, font, fill) {
+    const r = sheet.addRow([value, '', '', '', '', '', '', '', '', '']);
+    sheet.mergeCells(`A${r.number}:J${r.number}`);
+    r.getCell(1).font = font || boldFont;
+    r.getCell(1).alignment = centerAlign;
+    if (fill) r.getCell(1).fill = headerFill;
+    r.getCell(1).border = thinBorder;
+    return r;
+  }
+
+  addMergedTitle(paymentAbstractSheet, 'GUJARAT URBAN DEVELOPMENT COMPANY, GANDHINAGAR', titleFont, true);
+  addMergedTitle(paymentAbstractSheet, 'HALOL WSS SWAP-III under AMRUT 2.0 & SJMMSVY UGD PHASE II', subTitleFont, true);
+  addMergedTitle(paymentAbstractSheet, work_name || 'Full Work Name', boldFont, false);
+  paymentAbstractSheet.getRow(3).height = 30;
+  addMergedTitle(paymentAbstractSheet, `Work Order No: ${work_order_no || '-'}   Date: ${bill_date}`, null, false);
+  addMergedTitle(paymentAbstractSheet, `Agency: ${agency_name || '-'}`, null, false);
+  addMergedTitle(paymentAbstractSheet, `RA Bill - ${bill_no}`, boldFont, false);
+  addMergedTitle(paymentAbstractSheet, 'GROSS PAYMENT SUMMARY OF ABSTRACT', boldFont, true);
+
+  const pHeader = paymentAbstractSheet.addRow(['Sr.No', 'Schedule No', 'Nagarpalika', 'BOQ Quoted Amt', 'Upto Date Amt', 'Prev Bill Amt', 'This Bill Amt', '', '', '']);
+  paymentAbstractSheet.mergeCells(`G${pHeader.number}:J${pHeader.number}`);
+  pHeader.eachCell(c => styleHeader(c));
+  paymentAbstractSheet.views = [{ state: 'frozen', ySplit: pHeader.number }];
+
+  const schedNames = Object.keys(schedules);
+  const wssRow = paymentAbstractSheet.addRow([
+    1, schedNames[0] || 'B-1', 'Halol WSS',
+    grandTotals.tender_amt, grandTotals.upto_amt, prevAmt, thisAmt, '', '', ''
+  ]);
+  paymentAbstractSheet.mergeCells(`G${wssRow.number}:J${wssRow.number}`);
+  wssRow.getCell(1).alignment = centerAlign; applyBorder(wssRow.getCell(1));
+  wssRow.getCell(2).alignment = centerAlign; applyBorder(wssRow.getCell(2));
+  wssRow.getCell(3).alignment = leftAlign; applyBorder(wssRow.getCell(3));
+  for (const c of [4, 5, 6, 7]) applyAmount(wssRow.getCell(c));
+  wssRow.getCell(7).font = boldFont;
+
+  const ugdRow = paymentAbstractSheet.addRow([2, schedNames[1] || 'C-1', 'Halol UGD', 0, 0, 0, 0, '', '', '']);
+  paymentAbstractSheet.mergeCells(`G${ugdRow.number}:J${ugdRow.number}`);
+  ugdRow.getCell(1).alignment = centerAlign; applyBorder(ugdRow.getCell(1));
+  ugdRow.getCell(2).alignment = centerAlign; applyBorder(ugdRow.getCell(2));
+  ugdRow.getCell(3).alignment = leftAlign; applyBorder(ugdRow.getCell(3));
+  for (const c of [4, 5, 6, 7]) applyAmount(ugdRow.getCell(c));
+
+  const noteRow = paymentAbstractSheet.addRow([`Net Payable (Excl. GST): ₹${netPayable.toLocaleString('en-IN', { maximumFractionDigits: 2 })}  |  5% Retention: ₹${retention.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`, '', '', '', '', '', '', '', '', '']);
+  paymentAbstractSheet.mergeCells(`A${noteRow.number}:J${noteRow.number}`);
+  noteRow.getCell(1).font = boldFont;
+  noteRow.getCell(1).alignment = centerAlign;
+  noteRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF90EE90' } };
+
+  // ─────────────────────────────────────────────────────────────────
+  // STEP 2: Populate Sheet 2 - Statement of Account
+  // ─────────────────────────────────────────────────────────────────
+  statementSheet.columns = [
+    { key: 'label', width: 6  },
+    { key: 'desc',  width: 60 },
+    { key: 'amt',   width: 20 },
+  ];
+
+  const stTitle = statementSheet.addRow(['STATEMENT OF ACCOUNT', '', '']);
+  statementSheet.mergeCells(`A${stTitle.number}:C${stTitle.number}`);
+  stTitle.getCell(1).font = titleFont;
+  stTitle.getCell(1).alignment = centerAlign;
+  stTitle.getCell(1).fill = headerFill;
+
+  const stH = statementSheet.addRow(['Ref', 'Particulars', 'Amount (₹)']);
+  stH.eachCell(c => styleHeader(c));
+
+  const stmtRows = [
+    ['A', 'Halol WSS - This Bill Amount', thisAmt],
+    ['B', 'Halol UGD - This Bill Amount (if applicable)', 0],
+    ['C', 'Total (A + B)', totalC],
+    ['D', 'T.P. @ 3.60% of C', -tpAmt],
+    ['E', 'Net Amount after T.P. (C - D)', afterTP],
+    ['F', 'Price Variation (Clause-59)', priceVar],
+    ['G', 'Total (E + F)', afterPV],
+    ['H', '5% Retention of G', -retention],
+    ['I', 'Net Payable Amount (G - H)  [Excl. GST]', netPayable],
+  ];
+
+  for (const [ref, desc, amt] of stmtRows) {
+    const r = statementSheet.addRow([ref, desc, amt]);
+    r.getCell(1).font = boldFont; r.getCell(1).alignment = centerAlign; applyBorder(r.getCell(1));
+    r.getCell(2).alignment = leftAlign; applyBorder(r.getCell(2));
+    r.getCell(3).numFmt = amountFmt; r.getCell(3).alignment = rightAlign; applyBorder(r.getCell(3));
+    if (ref === 'I') { r.font = boldFont; r.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF90EE90' } }; }
+  }
+
+  // ─────────────────────────────────────────────────────────────────
+  // STEP 2: Populate Sheet 3 - Abstract Sheet
+  // ─────────────────────────────────────────────────────────────────
   abstractSheet.columns = [
     { key: 'sr',        width: 6  },
     { key: 'schedule',  width: 12 },
@@ -99,7 +220,6 @@ async function generateRaBill(billData) {
     { key: 'upto_amt',  width: 14 },
   ];
 
-  // Header rows
   const ah1 = abstractSheet.addRow(['GUJARAT URBAN DEVELOPMENT COMPANY, GANDHINAGAR', '', '', '', '', '', '', '', '', '', '', '', '']);
   abstractSheet.mergeCells(`A${ah1.number}:M${ah1.number}`);
   Object.assign(ah1.getCell(1), { font: titleFont, alignment: centerAlign, fill: headerFill });
@@ -121,7 +241,6 @@ async function generateRaBill(billData) {
   abstractSheet.mergeCells(`A${ah5.number}:M${ah5.number}`);
   ah5.getCell(1).alignment = centerAlign;
 
-  // Column headers
   const headerLabels = ['Sr\nNo', 'Schedule\nNo', 'Description of Work', 'Unit',
     'Tender\nQty', 'Tender\nRate', 'Tender\nAmount',
     'Prev Bill\nQty', 'Prev Bill\nAmount',
@@ -132,10 +251,8 @@ async function generateRaBill(billData) {
   ach.eachCell(cell => styleHeader(cell));
   abstractSheet.views = [{ state: 'frozen', ySplit: ach.number }];
 
-  // Data rows
   let srNo = 1;
   for (const [sched, rows] of Object.entries(schedules)) {
-    // Schedule group header
     const sgRow = abstractSheet.addRow(['', sched, `Schedule: ${sched}`, '', '', '', '', '', '', '', '', '', '']);
     abstractSheet.mergeCells(`C${sgRow.number}:M${sgRow.number}`);
     sgRow.getCell(1).font = boldFont; sgRow.getCell(2).font = boldFont; sgRow.getCell(3).font = boldFont;
@@ -157,7 +274,6 @@ async function generateRaBill(billData) {
       for (let c = 5; c <= 13; c++) applyAmount(dataRow.getCell(c));
     }
 
-    // Sub-total row
     const t = schedTotals[sched];
     const stRow = abstractSheet.addRow(['', '', `Sub-Total: ${sched}`, '', '', '', t.tender_amt, '', t.prev_amt, '', t.this_amt, '', t.upto_amt]);
     stRow.getCell(1).border = thinBorder; stRow.getCell(2).border = thinBorder;
@@ -168,7 +284,6 @@ async function generateRaBill(billData) {
     stRow.fill = headerFill;
   }
 
-  // Grand total row
   const gtRow = abstractSheet.addRow(['', '', 'GRAND TOTAL', '', '', '', grandTotals.tender_amt, '', grandTotals.prev_amt, '', grandTotals.this_amt, '', grandTotals.upto_amt]);
   gtRow.getCell(3).font = { bold: true, size: 12 };
   for (let c = 1; c <= 13; c++) {
@@ -179,126 +294,174 @@ async function generateRaBill(billData) {
   gtRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFE0B2' } };
 
   // ─────────────────────────────────────────────────────────────────
-  // Sheet 2: Statement of Accounts
+  // STEP 2: Populate Sheet 4 - MB Sheet
   // ─────────────────────────────────────────────────────────────────
-  const stmtSheet = workbook.addWorksheet('STATEMENT OF ACCOUNTS');
-  stmtSheet.columns = [
-    { key: 'label', width: 6  },
-    { key: 'desc',  width: 60 },
-    { key: 'amt',   width: 20 },
+  mbSheet.columns = [
+    { key: 'sr',    width: 6  },
+    { key: 'item',  width: 40 },
+    { key: 'unit',  width: 10 },
+    { key: 'qty',   width: 12 },
+    { key: 'rate',  width: 14 },
+    { key: 'amt',   width: 16 },
   ];
 
-  const stTitle = stmtSheet.addRow(['STATEMENT OF ACCOUNTS', '', '']);
-  stmtSheet.mergeCells(`A${stTitle.number}:C${stTitle.number}`);
-  stTitle.getCell(1).font = titleFont;
-  stTitle.getCell(1).alignment = centerAlign;
-  stTitle.getCell(1).fill = headerFill;
+  const mbTitle = mbSheet.addRow(['MEASUREMENT BOOK (MB SHEET)', '', '', '', '', '']);
+  mbSheet.mergeCells(`A${mbTitle.number}:F${mbTitle.number}`);
+  mbTitle.getCell(1).font = titleFont;
+  mbTitle.getCell(1).alignment = centerAlign;
+  mbTitle.getCell(1).fill = headerFill;
 
-  const stH = stmtSheet.addRow(['Ref', 'Particulars', 'Amount (₹)']);
-  stH.eachCell(c => styleHeader(c));
+  const mbInfo = mbSheet.addRow([`RA Bill No. ${bill_no}   |   Date: ${bill_date}   |   ${work_name || ''}`, '', '', '', '', '']);
+  mbSheet.mergeCells(`A${mbInfo.number}:F${mbInfo.number}`);
+  mbInfo.getCell(1).alignment = centerAlign;
 
-  const tp = 0.036; // 3.60%
-  const totalC = thisAmt;
-  const tpAmt = totalC * tp;
-  const afterTP = totalC - tpAmt;
-  const priceVar = 0;
-  const afterPV = afterTP + priceVar;
-  const retention = afterPV * 0.05;
-  const netPayable = afterPV - retention;
+  const mbHeader = mbSheet.addRow(['Sr.No', 'Description of Item', 'Unit', 'Quantity', 'Rate', 'Amount']);
+  mbHeader.eachCell(c => styleHeader(c));
+  mbSheet.views = [{ state: 'frozen', ySplit: mbHeader.number }];
 
-  const stmtRows = [
-    ['A', 'Halol WSS - This Bill Amount', thisAmt],
-    ['B', 'Halol UGD - This Bill Amount (if applicable)', 0],
-    ['C', 'Total (A + B)', totalC],
-    ['D', 'T.P. @ 3.60% of C', -tpAmt],
-    ['E', 'Net Amount after T.P. (C - D)', afterTP],
-    ['F', 'Price Variation (Clause-59)', priceVar],
-    ['G', 'Total (E + F)', afterPV],
-    ['H', '5% Retention of G', -retention],
-    ['I', 'Net Payable Amount (G - H)  [Excl. GST]', netPayable],
+  let mbSr = 1;
+  for (const item of items) {
+    const mbRow = mbSheet.addRow([
+      mbSr++, item.description || '', item.unit || '',
+      item.this_qty || 0, item.tender_rate || 0, item.this_amount || 0,
+    ]);
+    mbRow.getCell(1).alignment = centerAlign; mbRow.getCell(1).border = thinBorder;
+    mbRow.getCell(2).alignment = leftAlign;   mbRow.getCell(2).border = thinBorder;
+    mbRow.getCell(3).alignment = centerAlign; mbRow.getCell(3).border = thinBorder;
+    applyAmount(mbRow.getCell(4));
+    applyAmount(mbRow.getCell(5));
+    applyAmount(mbRow.getCell(6));
+  }
+
+  const mbTotal = mbSheet.addRow(['', 'TOTAL', '', '', '', grandTotals.this_amt]);
+  mbTotal.getCell(2).font = boldFont; mbTotal.getCell(2).border = thinBorder;
+  mbTotal.getCell(1).border = thinBorder; mbTotal.getCell(3).border = thinBorder;
+  mbTotal.getCell(4).border = thinBorder; mbTotal.getCell(5).border = thinBorder;
+  applyAmount(mbTotal.getCell(6));
+  mbTotal.getCell(6).font = boldFont;
+  mbTotal.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFE0B2' } };
+
+  // ─────────────────────────────────────────────────────────────────
+  // STEP 2: Populate Sheet 5 - Pipe Statement of Supply
+  // ─────────────────────────────────────────────────────────────────
+  pipeSheet.columns = [
+    { key: 'sr',      width: 6  },
+    { key: 'item',    width: 40 },
+    { key: 'unit',    width: 10 },
+    { key: 'tender',  width: 14 },
+    { key: 'used',    width: 14 },
+    { key: 'balance', width: 14 },
   ];
 
-  for (const [ref, desc, amt] of stmtRows) {
-    const r = stmtSheet.addRow([ref, desc, amt]);
-    r.getCell(1).font = boldFont; r.getCell(1).alignment = centerAlign; applyBorder(r.getCell(1));
-    r.getCell(2).alignment = leftAlign; applyBorder(r.getCell(2));
+  const pipeTitle = pipeSheet.addRow(['PIPE STATEMENT OF SUPPLY', '', '', '', '', '']);
+  pipeSheet.mergeCells(`A${pipeTitle.number}:F${pipeTitle.number}`);
+  pipeTitle.getCell(1).font = titleFont;
+  pipeTitle.getCell(1).alignment = centerAlign;
+  pipeTitle.getCell(1).fill = headerFill;
+
+  const pipeInfo = pipeSheet.addRow([`RA Bill No. ${bill_no}   |   Date: ${bill_date}   |   ${work_name || ''}`, '', '', '', '', '']);
+  pipeSheet.mergeCells(`A${pipeInfo.number}:F${pipeInfo.number}`);
+  pipeInfo.getCell(1).alignment = centerAlign;
+
+  const pipeHeader = pipeSheet.addRow(['Sr.No', 'Description of Item', 'Unit', 'Tender Qty', 'Qty Used', 'Balance Qty']);
+  pipeHeader.eachCell(c => styleHeader(c));
+  pipeSheet.views = [{ state: 'frozen', ySplit: pipeHeader.number }];
+
+  let pipeSr = 1;
+  for (const item of items) {
+    const balance = (item.tender_qty || 0) - (item.this_qty || 0);
+    const pipeRow = pipeSheet.addRow([
+      pipeSr++, item.description || '', item.unit || '',
+      item.tender_qty || 0, item.this_qty || 0, balance,
+    ]);
+    pipeRow.getCell(1).alignment = centerAlign; pipeRow.getCell(1).border = thinBorder;
+    pipeRow.getCell(2).alignment = leftAlign;   pipeRow.getCell(2).border = thinBorder;
+    pipeRow.getCell(3).alignment = centerAlign; pipeRow.getCell(3).border = thinBorder;
+    applyAmount(pipeRow.getCell(4));
+    applyAmount(pipeRow.getCell(5));
+    applyAmount(pipeRow.getCell(6));
+  }
+
+  // ─────────────────────────────────────────────────────────────────
+  // STEP 2: Populate Sheet 6 - Annexure - 1
+  // ─────────────────────────────────────────────────────────────────
+  annexure1Sheet.columns = [
+    { key: 'sr',   width: 6  },
+    { key: 'item', width: 50 },
+    { key: 'amt',  width: 20 },
+  ];
+
+  const ann1Title = annexure1Sheet.addRow(['ANNEXURE - 1 (Deductions / Recoveries)', '', '']);
+  annexure1Sheet.mergeCells(`A${ann1Title.number}:C${ann1Title.number}`);
+  ann1Title.getCell(1).font = titleFont;
+  ann1Title.getCell(1).alignment = centerAlign;
+  ann1Title.getCell(1).fill = headerFill;
+
+  const ann1Info = annexure1Sheet.addRow([`RA Bill No. ${bill_no}   |   Date: ${bill_date}`, '', '']);
+  annexure1Sheet.mergeCells(`A${ann1Info.number}:C${ann1Info.number}`);
+  ann1Info.getCell(1).alignment = centerAlign;
+
+  const ann1Header = annexure1Sheet.addRow(['Sr.No', 'Particulars', 'Amount (₹)']);
+  ann1Header.eachCell(c => styleHeader(c));
+
+  const ann1Rows = [
+    ['1', 'T.P. @ 3.60%', tpAmt],
+    ['2', '5% Retention Money', retention],
+    ['3', 'Any Other Deduction', 0],
+  ];
+  for (const [sr, desc, amt] of ann1Rows) {
+    const r = annexure1Sheet.addRow([sr, desc, amt]);
+    r.getCell(1).alignment = centerAlign; applyBorder(r.getCell(1));
+    r.getCell(2).alignment = leftAlign;   applyBorder(r.getCell(2));
     r.getCell(3).numFmt = amountFmt; r.getCell(3).alignment = rightAlign; applyBorder(r.getCell(3));
-    if (ref === 'I') { r.font = boldFont; r.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF90EE90' } }; }
   }
 
-  // ─────────────────────────────────────────────────────────────────
-  // Sheet 1: Payment Abstract
-  // ─────────────────────────────────────────────────────────────────
-  const paySheet = workbook.addWorksheet('Payment Abstract', {}, 0); // insert at position 0 (first)
-  workbook.spliceWorksheets(0, 0, paySheet); // move to first position
+  const ann1Total = annexure1Sheet.addRow(['', 'Total Deductions', tpAmt + retention]);
+  ann1Total.getCell(1).border = thinBorder;
+  ann1Total.getCell(2).font = boldFont; ann1Total.getCell(2).border = thinBorder;
+  applyAmount(ann1Total.getCell(3));
+  ann1Total.getCell(3).font = boldFont;
+  ann1Total.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFE0B2' } };
 
-  paySheet.columns = [
-    { key: 'a', width: 8  },
-    { key: 'b', width: 14 },
-    { key: 'c', width: 25 },
-    { key: 'd', width: 18 },
-    { key: 'e', width: 18 },
-    { key: 'f', width: 18 },
-    { key: 'g', width: 18 },
-    { key: 'h', width: 12 },
-    { key: 'i', width: 12 },
-    { key: 'j', width: 12 },
+  // ─────────────────────────────────────────────────────────────────
+  // STEP 2: Populate Sheet 7 - Annexure - 2
+  // ─────────────────────────────────────────────────────────────────
+  annexure2Sheet.columns = [
+    { key: 'sr',   width: 6  },
+    { key: 'item', width: 50 },
+    { key: 'amt',  width: 20 },
   ];
 
-  function addMergedTitle(sheet, rowNo, value, font, fill) {
-    const r = sheet.addRow([value, '', '', '', '', '', '', '', '', '']);
-    sheet.mergeCells(`A${r.number}:J${r.number}`);
-    r.getCell(1).font = font || boldFont;
-    r.getCell(1).alignment = centerAlign;
-    if (fill) r.getCell(1).fill = headerFill;
-    r.getCell(1).border = thinBorder;
-    return r;
+  const ann2Title = annexure2Sheet.addRow(['ANNEXURE - 2 (Net Payment Summary)', '', '']);
+  annexure2Sheet.mergeCells(`A${ann2Title.number}:C${ann2Title.number}`);
+  ann2Title.getCell(1).font = titleFont;
+  ann2Title.getCell(1).alignment = centerAlign;
+  ann2Title.getCell(1).fill = headerFill;
+
+  const ann2Info = annexure2Sheet.addRow([`RA Bill No. ${bill_no}   |   Date: ${bill_date}`, '', '']);
+  annexure2Sheet.mergeCells(`A${ann2Info.number}:C${ann2Info.number}`);
+  ann2Info.getCell(1).alignment = centerAlign;
+
+  const ann2Header = annexure2Sheet.addRow(['Sr.No', 'Particulars', 'Amount (₹)']);
+  ann2Header.eachCell(c => styleHeader(c));
+
+  const ann2Rows = [
+    ['1', 'Gross Bill Amount (This Bill)', thisAmt],
+    ['2', 'Less: T.P. @ 3.60%', -tpAmt],
+    ['3', 'Less: 5% Retention', -retention],
+    ['4', 'Net Payable Amount (Excl. GST)', netPayable],
+  ];
+  for (const [sr, desc, amt] of ann2Rows) {
+    const r = annexure2Sheet.addRow([sr, desc, amt]);
+    r.getCell(1).alignment = centerAlign; applyBorder(r.getCell(1));
+    r.getCell(2).alignment = leftAlign;   applyBorder(r.getCell(2));
+    r.getCell(3).numFmt = amountFmt; r.getCell(3).alignment = rightAlign; applyBorder(r.getCell(3));
+    if (sr === '4') { r.font = boldFont; r.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF90EE90' } }; }
   }
 
-  addMergedTitle(paySheet, 1, 'GUJARAT URBAN DEVELOPMENT COMPANY, GANDHINAGAR', titleFont, true);
-  addMergedTitle(paySheet, 2, 'HALOL WSS SWAP-III under AMRUT 2.0 & SJMMSVY UGD PHASE II', subTitleFont, true);
-  addMergedTitle(paySheet, 3, work_name || 'Full Work Name', boldFont, false);
-  paySheet.getRow(3).height = 30;
-  addMergedTitle(paySheet, 4, `Work Order No: ${work_order_no || '-'}   Date: ${bill_date}`, null, false);
-  addMergedTitle(paySheet, 5, `Agency: ${agency_name || '-'}`, null, false);
-  addMergedTitle(paySheet, 6, `RA Bill - ${bill_no}`, boldFont, false);
-  addMergedTitle(paySheet, 7, 'GROSS PAYMENT SUMMARY OF ABSTRACT', boldFont, true);
-
-  // Table header row 8
-  const pHeader = paySheet.addRow(['Sr.No', 'Schedule No', 'Nagarpalika', 'BOQ Quoted Amt', 'Upto Date Amt', 'Prev Bill Amt', 'This Bill Amt', '', '', '']);
-  paySheet.mergeCells(`G${pHeader.number}:J${pHeader.number}`);
-  pHeader.eachCell(c => styleHeader(c));
-  paySheet.views = [{ state: 'frozen', ySplit: pHeader.number }];
-
-  // Row 9: Halol WSS data
-  const schedNames = Object.keys(schedules);
-  const wssRow = paySheet.addRow([
-    1, schedNames[0] || 'B-1', 'Halol WSS',
-    grandTotals.tender_amt, grandTotals.upto_amt, prevAmt, thisAmt, '', '', ''
-  ]);
-  paySheet.mergeCells(`G${wssRow.number}:J${wssRow.number}`);
-  wssRow.getCell(1).alignment = centerAlign; applyBorder(wssRow.getCell(1));
-  wssRow.getCell(2).alignment = centerAlign; applyBorder(wssRow.getCell(2));
-  wssRow.getCell(3).alignment = leftAlign; applyBorder(wssRow.getCell(3));
-  for (const c of [4, 5, 6, 7]) applyAmount(wssRow.getCell(c));
-  wssRow.getCell(7).font = boldFont;
-
-  // Row 10: Halol UGD (placeholder row)
-  const ugdRow = paySheet.addRow([2, schedNames[1] || 'C-1', 'Halol UGD', 0, 0, 0, 0, '', '', '']);
-  paySheet.mergeCells(`G${ugdRow.number}:J${ugdRow.number}`);
-  ugdRow.getCell(1).alignment = centerAlign; applyBorder(ugdRow.getCell(1));
-  ugdRow.getCell(2).alignment = centerAlign; applyBorder(ugdRow.getCell(2));
-  ugdRow.getCell(3).alignment = leftAlign; applyBorder(ugdRow.getCell(3));
-  for (const c of [4, 5, 6, 7]) applyAmount(ugdRow.getCell(c));
-
-  // Summary note
-  const noteRow = paySheet.addRow([`Net Payable (Excl. GST): ₹${netPayable.toLocaleString('en-IN', { maximumFractionDigits: 2 })}  |  5% Retention: ₹${retention.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`, '', '', '', '', '', '', '', '', '']);
-  paySheet.mergeCells(`A${noteRow.number}:J${noteRow.number}`);
-  noteRow.getCell(1).font = boldFont;
-  noteRow.getCell(1).alignment = centerAlign;
-  noteRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF90EE90' } };
-
-  // Return as buffer
+  // ─────────────────────────────────────────────────────────────────
+  // STEP 3: Return as buffer
+  // ─────────────────────────────────────────────────────────────────
   const buffer = await workbook.xlsx.writeBuffer();
   return buffer;
 }
