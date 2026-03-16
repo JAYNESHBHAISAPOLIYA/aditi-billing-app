@@ -31,6 +31,7 @@ app.use('/api/boq', require('./routes/boq'));
 app.use('/api/vendors', require('./routes/vendors'));
 app.use('/api/alerts', require('./routes/alerts'));
 app.use('/api/dashboard', require('./routes/dashboard'));
+app.use('/api/ai', require('./routes/ai').router);
 
 // Serve React frontend in production
 if (process.env.NODE_ENV === 'production') {

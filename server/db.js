@@ -200,6 +200,51 @@ function initializeDatabase() {
       FOREIGN KEY (site_id) REFERENCES sites(id)
     );
 
+    -- SOR Rates (Schedule of Rates - Government published rate book)
+    CREATE TABLE IF NOT EXISTS sor_rates (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      state TEXT NOT NULL DEFAULT 'Gujarat',
+      year TEXT NOT NULL DEFAULT '2024-25',
+      item_code TEXT,
+      description TEXT NOT NULL,
+      unit TEXT NOT NULL,
+      rate REAL NOT NULL,
+      category TEXT,
+      keywords TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    -- DPR Records (Daily Progress Reports with AI-extracted data)
+    CREATE TABLE IF NOT EXISTS dpr_records (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      site_id INTEGER NOT NULL,
+      report_date TEXT NOT NULL,
+      work_done TEXT,
+      labour_skilled INTEGER DEFAULT 0,
+      labour_unskilled INTEGER DEFAULT 0,
+      labour_amount REAL DEFAULT 0,
+      materials_used TEXT,
+      remarks TEXT,
+      weather TEXT,
+      source_file TEXT,
+      ai_raw_response TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (site_id) REFERENCES sites(id)
+    );
+
+    -- AI Chat History
+    CREATE TABLE IF NOT EXISTS ai_chat_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      site_id INTEGER,
+      user_id INTEGER,
+      question TEXT NOT NULL,
+      answer TEXT NOT NULL,
+      tables_referenced TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (site_id) REFERENCES sites(id),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+
     -- Vendors
     CREATE TABLE IF NOT EXISTS vendors (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -223,6 +268,34 @@ function initializeDatabase() {
       FOREIGN KEY (site_id) REFERENCES sites(id)
     );
   `);
+
+  // Add new columns to boq_items if they don't exist (migration)
+  const boqCols = db.pragma('table_info(boq_items)').map(c => c.name);
+  if (!boqCols.includes('qty_used')) db.exec('ALTER TABLE boq_items ADD COLUMN qty_used REAL DEFAULT 0');
+  if (!boqCols.includes('source_doc')) db.exec('ALTER TABLE boq_items ADD COLUMN source_doc TEXT');
+  if (!boqCols.includes('item_code')) db.exec('ALTER TABLE boq_items ADD COLUMN item_code TEXT');
+  if (!boqCols.includes('sor_rate_id')) db.exec('ALTER TABLE boq_items ADD COLUMN sor_rate_id INTEGER');
+  if (!boqCols.includes('sor_match_pct')) db.exec('ALTER TABLE boq_items ADD COLUMN sor_match_pct REAL DEFAULT 0');
+
+  // Seed SOR rates if table is empty
+  const sorCount = db.prepare('SELECT COUNT(*) as n FROM sor_rates').get();
+  if (sorCount.n === 0) {
+    const sorData = [
+      { code: 'WSS-001', desc: 'DI K7 pipe 100mm dia supply and laying', unit: 'RM', rate: 485, cat: 'Water Supply', kw: 'di pipe 100mm k7 water supply laying' },
+      { code: 'WSS-002', desc: 'DI K9 pipe 150mm dia supply and laying', unit: 'RM', rate: 720, cat: 'Water Supply', kw: 'di pipe 150mm k9 water supply laying' },
+      { code: 'WSS-003', desc: 'HDPE pipe 63mm dia supply and laying', unit: 'RM', rate: 185, cat: 'Water Supply', kw: 'hdpe pipe 63mm polyethylene laying' },
+      { code: 'WSS-004', desc: 'Sluice valve 100mm NP16 with CI body', unit: 'NO', rate: 12500, cat: 'Water Supply', kw: 'sluice valve 100mm gate valve ci' },
+      { code: 'WSS-005', desc: 'RCC Boundary wall 230mm thick including excavation', unit: 'RM', rate: 2850, cat: 'Civil Works', kw: 'rcc boundary wall 230mm excavation' },
+      { code: 'RD-001', desc: 'Earthwork in excavation in ordinary soil up to 1.5m', unit: 'CUM', rate: 145, cat: 'Road Works', kw: 'earthwork excavation ordinary soil road' },
+      { code: 'RD-002', desc: 'GSB (Granular Sub Base) material supply and laying', unit: 'CUM', rate: 1250, cat: 'Road Works', kw: 'gsb granular sub base road laying' },
+      { code: 'RD-003', desc: 'WBM Grade III water bound macadam', unit: 'CUM', rate: 1850, cat: 'Road Works', kw: 'wbm water bound macadam grade iii road' },
+      { code: 'BLD-001', desc: 'Cement concrete M25 grade in RCC work', unit: 'CUM', rate: 7500, cat: 'Building Works', kw: 'cement concrete m25 rcc structure building' },
+      { code: 'BLD-002', desc: 'Reinforcement steel Fe-500 supply and fabrication', unit: 'MT', rate: 68000, cat: 'Building Works', kw: 'reinforcement steel fe500 rebar bar fabrication' },
+    ];
+    const sorInsert = db.prepare('INSERT INTO sor_rates (item_code, description, unit, rate, category, keywords) VALUES (?, ?, ?, ?, ?, ?)');
+    const insertMany = db.transaction((rows) => { for (const r of rows) sorInsert.run(r.code, r.desc, r.unit, r.rate, r.cat, r.kw); });
+    insertMany(sorData);
+  }
 }
 
 module.exports = { db, initializeDatabase };
