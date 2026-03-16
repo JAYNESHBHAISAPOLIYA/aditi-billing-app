@@ -196,6 +196,42 @@ function initializeDatabase() {
       work_completed_pct REAL DEFAULT 0,
       remaining_work REAL,
       actual_cost REAL DEFAULT 0,
+      qty_tender REAL DEFAULT 0,
+      qty_used REAL DEFAULT 0,
+      sor_rate REAL DEFAULT 0,
+      sor_item_code TEXT,
+      source_doc TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (site_id) REFERENCES sites(id)
+    );
+
+    -- SOR Rates (Schedule of Rates)
+    CREATE TABLE IF NOT EXISTS sor_rates (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      state TEXT NOT NULL DEFAULT 'Gujarat',
+      year TEXT NOT NULL DEFAULT '2024-25',
+      item_code TEXT NOT NULL,
+      description TEXT NOT NULL,
+      unit TEXT NOT NULL,
+      rate REAL NOT NULL,
+      category TEXT,
+      keywords TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    -- DPR Records (Daily Progress Reports)
+    CREATE TABLE IF NOT EXISTS dpr_records (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      site_id INTEGER NOT NULL,
+      report_date TEXT NOT NULL,
+      work_done TEXT,
+      labour_skilled INTEGER DEFAULT 0,
+      labour_unskilled INTEGER DEFAULT 0,
+      labour_amount REAL DEFAULT 0,
+      materials_used TEXT,
+      weather TEXT,
+      remarks TEXT,
+      source_doc TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (site_id) REFERENCES sites(id)
     );
@@ -223,6 +259,39 @@ function initializeDatabase() {
       FOREIGN KEY (site_id) REFERENCES sites(id)
     );
   `);
+
+  // Migrate existing boq_items to add new columns if they don't exist
+  const boqCols = db.prepare("PRAGMA table_info(boq_items)").all().map(c => c.name);
+  if (!boqCols.includes('qty_tender')) db.exec("ALTER TABLE boq_items ADD COLUMN qty_tender REAL DEFAULT 0");
+  if (!boqCols.includes('qty_used')) db.exec("ALTER TABLE boq_items ADD COLUMN qty_used REAL DEFAULT 0");
+  if (!boqCols.includes('sor_rate')) db.exec("ALTER TABLE boq_items ADD COLUMN sor_rate REAL DEFAULT 0");
+  if (!boqCols.includes('sor_item_code')) db.exec("ALTER TABLE boq_items ADD COLUMN sor_item_code TEXT");
+  if (!boqCols.includes('source_doc')) db.exec("ALTER TABLE boq_items ADD COLUMN source_doc TEXT");
+
+  // Seed SOR rates if table is empty
+  const sorCount = db.prepare("SELECT COUNT(*) as c FROM sor_rates").get();
+  if (sorCount.c === 0) {
+    const insertSor = db.prepare(`
+      INSERT INTO sor_rates (state, year, item_code, description, unit, rate, category, keywords)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    const sorData = [
+      ['Gujarat','2024-25','WS-001','Supply & Laying DI K7 Pipe 100mm dia','RM',485,'Water Supply','di pipe 100mm k7 ductile iron water supply'],
+      ['Gujarat','2024-25','WS-002','Supply & Laying DI K7 Pipe 150mm dia','RM',720,'Water Supply','di pipe 150mm k7 ductile iron water supply'],
+      ['Gujarat','2024-25','WS-003','Supply & Laying DI K7 Pipe 200mm dia','RM',1050,'Water Supply','di pipe 200mm k7 ductile iron water supply'],
+      ['Gujarat','2024-25','WS-004','Supply & Laying uPVC Pipe 63mm dia','RM',185,'Water Supply','upvc pipe 63mm plastic water supply distribution'],
+      ['Gujarat','2024-25','WS-005','Supply & Laying uPVC Pipe 90mm dia','RM',240,'Water Supply','upvc pipe 90mm plastic water supply distribution'],
+      ['Gujarat','2024-25','WS-006','Providing & Fixing Sluice Valve 100mm','Nos',4200,'Water Supply','sluice valve 100mm gate valve isolation'],
+      ['Gujarat','2024-25','WS-007','Providing & Fixing Air Valve 50mm','Nos',2800,'Water Supply','air valve 50mm air release valve'],
+      ['Gujarat','2024-25','WS-008','Construction of Brick Masonry Chamber','Nos',18500,'Civil Works','chamber brick masonry valve chamber'],
+      ['Gujarat','2024-25','RD-001','Earthwork Excavation in All Kinds of Soil','CUM',85,'Earthwork','earthwork excavation excavation soil'],
+      ['Gujarat','2024-25','RD-002','Providing & Laying GSB 200mm thick','CUM',1200,'Road Works','granular sub base gsb road pavement'],
+    ];
+    const insertAll = db.transaction(() => {
+      for (const row of sorData) insertSor.run(...row);
+    });
+    insertAll();
+  }
 }
 
 module.exports = { db, initializeDatabase };

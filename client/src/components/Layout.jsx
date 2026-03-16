@@ -19,6 +19,7 @@ const navItems = [
   { path: '/alerts', label: '🔔 Alerts', roles: ['owner', 'site_manager', 'accountant'] },
   { path: '/users', label: '👥 Users', roles: ['owner'] },
   { path: '/reports', label: '📈 Reports', roles: ['owner', 'accountant'] },
+  { path: '/ai-chat', label: '🤖 AI Assistant', roles: ['owner', 'site_manager', 'accountant', 'worker'] },
 ];
 
 export default function Layout() {
